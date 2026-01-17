@@ -8,14 +8,27 @@ import streamlit as st
 from pathlib import Path
 import sys
 import time
+import logging
 
 try:
     from graph import app_graph
     from rag.document_manager import DocumentManager
     from utils.logger import StreamlitLogHandler
+    from persistence import get_memory_manager
 except ImportError as e:
     st.error(f"Import Error: {str(e)}")
     sys.exit(1)
+
+# Setup logging for Streamlit app
+logger = logging.getLogger(__name__)
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('[%(asctime)s] [STREAMLIT] %(levelname)s: %(message)s', datefmt='%H:%M:%S')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
 
 # Configure page
 st.set_page_config(
@@ -207,17 +220,28 @@ st.divider()
 
 # Logs section (if enabled)
 logs_container = None
+logs_placeholder = None
+
 if show_logs:
     st.markdown("### 📝 Agent Communication Log")
     logs_container = st.container(border=True)
     logs_placeholder = logs_container.empty()
+    
+    # Initialize session state for logs if needed
+    if 'streamlit_logs' not in st.session_state:
+        st.session_state.streamlit_logs = []
 
 # Results section
 if run_button and query.strip():
     status_placeholder.warning("⏳ Research in progress...")
     
     try:
-        # Clear previous logs
+        # Clear previous logs in session state
+        if 'streamlit_logs' not in st.session_state:
+            st.session_state.streamlit_logs = []
+        st.session_state.streamlit_logs.clear()
+        
+        # Clear logs from handler
         StreamlitLogHandler.clear_logs()
         
         # Run research
@@ -229,16 +253,48 @@ if run_button and query.strip():
         # Get all logs from the handler
         all_logs = StreamlitLogHandler.get_logs()
         
+        # Store logs in session state for persistence
+        if all_logs:
+            st.session_state.streamlit_logs = all_logs
+        
         # Display logs in real-time if enabled
-        if show_logs and logs_container and all_logs:
-            log_text = "\n".join(all_logs)
-            logs_placeholder.code(log_text, language="log")
+        if show_logs and logs_placeholder and (all_logs or st.session_state.get('streamlit_logs')):
+            log_text = "\n".join(st.session_state.get('streamlit_logs', []))
+            if log_text.strip():
+                logs_placeholder.code(log_text, language="log")
+            else:
+                logs_placeholder.info("📌 No logs captured. Ensure agents are calling logging functions.")
+        elif show_logs and logs_placeholder:
+            logs_placeholder.info("📌 Research will display logs here...")
         
         progress.progress(100)
         status_placeholder.success("✅ Research Complete!")
         
         # Store results
         st.session_state.results = result
+        
+        # Save to MongoDB
+        try:
+            logger.info("Saving research to MongoDB...")
+            memory_manager = get_memory_manager()
+            
+            research_id = memory_manager.save_research(
+                query=query.strip(),
+                research=result.get("research", ""),
+                critique=result.get("critique", ""),
+                final_answer=result.get("final_answer", ""),
+                metadata={}
+            )
+            
+            logger.info(f"✅ Research saved to MongoDB with ID: {research_id}")
+            st.success(f"📦 Saved to MongoDB: {research_id}")
+            
+            # Store ID in session
+            st.session_state.research_id = research_id
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to save to MongoDB: {str(e)}")
+            st.warning(f"⚠️ Could not save to MongoDB: {str(e)}\n\nNote: Make sure MongoDB is running. Results are still displayed above.")
             
     except Exception as e:
         status_placeholder.error(f"❌ Error: {str(e)}")
@@ -248,6 +304,15 @@ if run_button and query.strip():
 if 'results' in st.session_state and st.session_state.results:
     st.divider()
     result = st.session_state.results
+    
+    # Show MongoDB ID if available
+    if 'research_id' in st.session_state:
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.info(f"💾 **Research saved to database**: `{st.session_state.research_id}`")
+        with col2:
+            if st.button("📋 Copy ID", key="copy_id"):
+                st.write(st.session_state.research_id)
     
     # Results in tabs
     tab1, tab2, tab3, tab4 = st.tabs(["📋 Summary", "🔬 Research", "✍️ Critique", "📊 Full"])

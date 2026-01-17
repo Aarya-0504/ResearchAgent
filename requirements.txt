@@ -1,8 +1,12 @@
 google-generativeai>=0.3.0
 python-dotenv>=1.0.0
 langchain>=0.1.0
+langchain-core>=0.1.0
 langchain-community>=0.1.0
 langchain-text-splitters>=0.0.1
+langchain-google-genai>=0.1.0
+langchain-anthropic>=0.1.0
+langchain-openai>=0.1.0
 faiss-cpu>=1.7.4
 sentence-transformers>=2.2.0
 pypdf>=3.17.0
@@ -13,4 +17,14 @@ pydantic>=2.0.0
 langgraph>=0.0.1
 streamlit>=1.28.0
 
+# Database & Persistence
+pymongo>=4.6.0
 
+# Optional: For Claude support (uncomment if using ANTHROPIC_API_KEY)
+# anthropic>=0.7.0
+
+# Optional: For OpenAI support (uncomment if using OPENAI_API_KEY)
+# openai>=1.0.0
+
+# Optional: GPU support
+# faiss-gpu>=1.7.4

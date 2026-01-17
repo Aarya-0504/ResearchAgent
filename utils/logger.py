@@ -47,6 +47,11 @@ class StreamlitLogHandler(logging.Handler):
         """Clear all logs."""
         cls._logs.clear()
     
+    @classmethod
+    def add_log(cls, message: str) -> None:
+        """Add a log message directly."""
+        cls._logs.append(message)
+    
     def emit(self, record):
         """Emit a log record."""
         try:
@@ -70,8 +75,13 @@ def get_logger(name: str, capture_for_streamlit: bool = True) -> logging.Logger:
     """
     logger = logging.getLogger(name)
     
-    # Only configure if not already configured
-    if not logger.handlers:
+    # Always ensure StreamlitLogHandler is present for Streamlit compatibility
+    has_streamlit_handler = any(isinstance(h, StreamlitLogHandler) for h in logger.handlers)
+    has_console_handler = any(isinstance(h, logging.StreamHandler) and not isinstance(h, StreamlitLogHandler) for h in logger.handlers)
+    
+    if not logger.handlers or not has_console_handler:
+        # Reset handlers to avoid duplicates
+        logger.handlers.clear()
         logger.setLevel(logging.DEBUG)
         
         # Console handler with colors
@@ -80,14 +90,14 @@ def get_logger(name: str, capture_for_streamlit: bool = True) -> logging.Logger:
         console_handler.setFormatter(ColoredFormatter())
         
         logger.addHandler(console_handler)
-        
-        # Streamlit handler for in-app display
-        if capture_for_streamlit:
-            streamlit_handler = StreamlitLogHandler()
-            streamlit_handler.setLevel(logging.DEBUG)
-            logger.addHandler(streamlit_handler)
-        
-        logger.propagate = False
+    
+    # Always add Streamlit handler if requested
+    if capture_for_streamlit and not has_streamlit_handler:
+        streamlit_handler = StreamlitLogHandler()
+        streamlit_handler.setLevel(logging.DEBUG)
+        logger.addHandler(streamlit_handler)
+    
+    logger.propagate = False
     
     return logger
 
