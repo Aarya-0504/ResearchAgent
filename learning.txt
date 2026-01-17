@@ -1,0 +1,42 @@
+User Query
+   ↓
+Planner Agent (LangGraph)
+   ↓
+Research Agent (Gemini + Web Search)
+   ↓
+RAG Retriever (FAISS)
+   ↓
+Critic Agent (Validation)
+   ↓
+Summarizer Agent
+   ↓
+FastAPI Response
+
+
+
+format:
+gemini-research-agent/
+│
+├── app/
+│   ├── main.py              # FastAPI app
+│   ├── graph.py             # LangGraph workflow
+│   │
+│   ├── agents/
+│   │   ├── planner.py
+│   │   ├── researcher.py
+│   │   ├── critic.py
+│   │   └── summarizer.py
+│   │
+│   ├── rag/
+│   │   ├── vectorstore.py
+│   │   └── ingest.py
+│   │
+│   ├── tools/
+│   │   └── web_search.py
+│   │
+│   └── utils/
+│       └── llm.py
+│
+├── .env
+├── requirements.txt
+└── README.md
